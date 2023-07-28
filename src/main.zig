@@ -1,24 +1,22 @@
 const std = @import("std");
 const io = std.io;
 const os = std.os;
-const wordsFile = @import("words.zig");
+const wz = @import("words.zig");
 
 const ArrayList = std.ArrayList;
 
-pub fn main() !void {
+fn indexFile(file_name: []const u8) !wz.Words {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer std.debug.assert(!gpa.deinit());
 
-    var file = try std.fs.cwd().openFile("./build.zig", .{});
+    var file = try std.fs.cwd().openFile(file_name, .{});
     defer file.close();
 
     var buf_reader = std.io.bufferedReader(file.reader());
     var in_stream = buf_reader.reader();
 
-    const Words = wordsFile.Words();
-
-    var words_list = Words.init(gpa.allocator());
-    defer .words.deinit();
+    var words_list = wz.Words.init(gpa.allocator());
+    defer words_list.deinit();
 
     var buf: [1024]u8 = undefined;
     while (try in_stream.readUntilDelimiterOrEof(&buf, '\n')) |line| {
@@ -32,20 +30,24 @@ pub fn main() !void {
                     i += 1;
                 } else {
                     if (i > 0) {
-                        words_list.push(clean_word);
+                        try words_list.push(clean_word);
                         i = 0;
                     }
                 }
             }
             if (i > 0) {
-                words_list.push(clean_word);
+                try words_list.push(clean_word);
             }
         }
     }
+    return words_list;
+}
 
+pub fn main() !void {
+    var words_list = try indexFile("./build.zig");
     // for (word_list.items) |word, i| {
     //     std.debug.print("{d}: {s}\n", .{ points_list.items[i], word });
     // }
 
-    // std.debug.print("word count: {d}\n", .{word_count});
+    std.debug.print("word count: {d}\n", .{words_list.count});
 }
