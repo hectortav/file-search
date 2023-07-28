@@ -42,12 +42,27 @@ fn indexFile(file_name: []const u8) !wz.Words {
     }
     return words_list;
 }
+//
+//pub fn main() !void {
+//    var words_list = try indexFile("./build.zig");
+//    // for (word_list.items) |word, i| {
+//    //     std.debug.print("{d}: {s}\n", .{ points_list.items[i], word });
+//    // }
+//
+//    std.debug.print("word count: {d}\n", .{words_list.count});
+//}
 
-pub fn main() !void {
-    var words_list = try indexFile("./build.zig");
-    // for (word_list.items) |word, i| {
-    //     std.debug.print("{d}: {s}\n", .{ points_list.items[i], word });
-    // }
+pub fn main() void {
+    var dir = std.fs.openIterableDirAbsolute("./", .{ .access_sub_paths = true }) catch unreachable;
+    var iterator = dir.iterate();
+    var it = iterator.next() catch |err| blk: {
+        switch (err) {
+            error.AccessDenied => std.log.err("AccessDenied at first iteration", .{}),
+            error.SystemResources => std.log.err("SystemResources at first iteration", .{}),
+            error.Unexpected => std.log.err("Unexpected at first iteration", .{}),
+        }
+        break :blk null;
+    };
 
-    std.debug.print("word count: {d}\n", .{words_list.count});
+    std.log.warn("it: {s}", .{it.?.name});
 }
