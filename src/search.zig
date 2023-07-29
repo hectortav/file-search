@@ -3,9 +3,9 @@ const io = std.io;
 const ArrayList = std.ArrayList;
 const AutoHashMap = std.AutoHashMap;
 const Allocator = std.mem.Allocator;
+const wz = @import("words.zig");
 
-const max_filename_length: u8 = 250;
-const max_word_length: u8 = 25;
+pub const max_filename_length: u8 = 250;
 
 const Value = struct {
     files: ArrayList([max_filename_length]u8),
@@ -46,12 +46,12 @@ const Value = struct {
     }
 };
 
-pub const Map = struct {
-    words: AutoHashMap([max_word_length]u8, Value),
+pub const Search = struct {
+    words: AutoHashMap([wz.max_word_length]u8, Value),
     const Self = @This();
 
     pub fn init(allocator: Allocator) Self {
-        return Self{ .words = AutoHashMap([max_word_length]u8, Value).init(allocator) };
+        return Self{ .words = AutoHashMap([wz.max_word_length]u8, Value).init(allocator) };
     }
 
     pub fn deinit(self: *Self) void {
@@ -62,7 +62,7 @@ pub const Map = struct {
         self.words.deinit();
     }
 
-    pub fn put(self: *Self, allocator: *const Allocator, word: [max_word_length]u8, file: [max_filename_length]u8, points: u16, count: u16) !void {
+    pub fn put(self: *Self, allocator: *const Allocator, word: [wz.max_word_length]u8, file: [max_filename_length]u8, points: u16, count: u16) !void {
         var v = try self.words.getOrPut(word);
 
         if (!v.found_existing) {
@@ -72,7 +72,7 @@ pub const Map = struct {
         try v.value_ptr.*.push(file, points, count);
     }
 
-    pub fn get(self: *Self, word: [max_word_length]u8) ?[max_filename_length]u8 {
+    pub fn get(self: *Self, word: [wz.max_word_length]u8) ?[max_filename_length]u8 {
         if (self.words.get(word)) |value| {
             return value.get();
         }

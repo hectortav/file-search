@@ -1,12 +1,10 @@
 const std = @import("std");
 const wz = @import("words.zig");
-const m = @import("map.zig");
+const s = @import("search.zig");
 const io = std.io;
 const os = std.os;
 
 const ArrayList = std.ArrayList;
-
-const max_filename_length: u8 = 250;
 
 fn literalToArr(literal: []const u8) [wz.max_word_length]u8 {
     var arr: [wz.max_word_length]u8 = [_:0]u8{0} ** wz.max_word_length;
@@ -47,7 +45,7 @@ fn indexFile(words_list: *wz.Words, file: std.fs.File) !void {
     }
 }
 
-fn getFiles(allocator: *const std.mem.Allocator, file_list: *ArrayList([max_filename_length]u8), dir: []const u8) !void {
+fn getFiles(allocator: *const std.mem.Allocator, file_list: *ArrayList([s.max_filename_length]u8), dir: []const u8) !void {
     var dir_list = ArrayList([]const u8).init(allocator.*);
     defer dir_list.deinit();
 
@@ -66,7 +64,7 @@ fn getFiles(allocator: *const std.mem.Allocator, file_list: *ArrayList([max_file
             while (try it.next()) |file| {
                 if (file.name[0] != '.') {
                     if (file.kind == .File) {
-                        var slice: [max_filename_length]u8 = [_:0]u8{0} ** max_filename_length;
+                        var slice: [s.max_filename_length]u8 = [_:0]u8{0} ** s.max_filename_length;
                         var i: usize = 0;
                         while (i < p.len) {
                             slice[i] = p[i];
@@ -98,23 +96,10 @@ pub fn main() !void {
 
     const allocator = arena.allocator();
 
-    var map = m.Map.init(allocator);
-    defer map.deinit();
+    var search = s.Search.init(allocator);
+    defer search.deinit();
 
-    // var filename: [250]u8 = [_:0]u8{0} ** 250;
-    // i = 0;
-    // while (i < "/filename".len) {
-    //     filename[i] = "/filename"[i];
-    //     i += 1;
-    // }
-    // try map.put(&allocator, "tests", "/filename", 10, 5);
-    // if (map.get("tests")) |value| {
-    //     std.debug.print("{s}\n", .{value});
-    // } else {
-    //     std.debug.print("not found\n", .{});
-    // }
-
-    var file_list = ArrayList([max_filename_length]u8).init(allocator);
+    var file_list = ArrayList([s.max_filename_length]u8).init(allocator);
     defer file_list.deinit();
 
     try getFiles(&allocator, &file_list, ".");
@@ -140,16 +125,16 @@ pub fn main() !void {
             // std.debug.print("{s} {s} {d} {d}\n", .{ tuple[0], file_name, tuple[1], word_count });
             const word = tuple[0];
             const points = tuple[1];
-            try map.put(&allocator, word, file_name, points, word_count);
+            try search.put(&allocator, word, file_name, points, word_count);
             i += 1;
         }
     }
 
-    if (map.get(literalToArr("tests"))) |res| {
+    if (search.get(literalToArr("tests"))) |res| {
         std.debug.print("tests: found in: {s}\n", .{res});
     }
 
-    if (map.get(literalToArr("ArrayList"))) |res| {
+    if (search.get(literalToArr("ArrayList"))) |res| {
         std.debug.print("ArrayList: found in: {s}\n", .{res});
     }
 }
