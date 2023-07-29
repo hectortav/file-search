@@ -1,17 +1,11 @@
 const std = @import("std");
 const wz = @import("words.zig");
 const s = @import("search.zig");
+const h = @import("helpers.zig");
 const io = std.io;
 const os = std.os;
 
 const ArrayList = std.ArrayList;
-
-fn literalToArr(literal: []const u8) [wz.max_word_length]u8 {
-    var arr: [wz.max_word_length]u8 = [_:0]u8{0} ** wz.max_word_length;
-    std.mem.copy(u8, &arr, literal);
-
-    return arr;
-}
 
 fn getFiles(allocator: *const std.mem.Allocator, file_list: *ArrayList([s.max_filename_length]u8), dir: []const u8) !void {
     var dir_list = ArrayList([]const u8).init(allocator.*);
@@ -97,12 +91,5 @@ pub fn main() !void {
             i += 1;
         }
     }
-
-    if (search.get(literalToArr("tests"))) |res| {
-        std.debug.print("tests: found in: {s}\n", .{res});
-    }
-
-    if (search.get(literalToArr("ArrayList"))) |res| {
-        std.debug.print("ArrayList: found in: {s}\n", .{res});
-    }
+    try search.search("tests ArrayList");
 }

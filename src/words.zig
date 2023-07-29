@@ -13,7 +13,11 @@ pub const Words = struct {
     const Self = @This();
 
     pub fn init(allocator: Allocator) Self {
-        return Self{ .words = ArrayList([max_word_length]u8).init(allocator), .points = ArrayList(u16).init(allocator), .count = 0 };
+        return Self{
+            .words = ArrayList([max_word_length]u8).init(allocator),
+            .points = ArrayList(u16).init(allocator),
+            .count = 0,
+        };
     }
 
     pub fn deinit(self: *Self) void {

@@ -1,9 +1,10 @@
 const std = @import("std");
-const io = std.io;
 const ArrayList = std.ArrayList;
 const AutoHashMap = std.AutoHashMap;
 const Allocator = std.mem.Allocator;
+const Tuple = std.meta.Tuple;
 const wz = @import("words.zig");
+const h = @import("helpers.zig");
 
 pub const max_filename_length: u8 = 250;
 
@@ -11,7 +12,6 @@ const Value = struct {
     files: ArrayList([max_filename_length]u8), // the file
     points: ArrayList(u16), // the amount of times the word is in the file
     count: ArrayList(u16), // the length of the file in words
-    occurrences: u16,
     const Self = @This();
 
     pub fn init(allocator: Allocator) Self {
@@ -19,7 +19,6 @@ const Value = struct {
             .files = ArrayList([max_filename_length]u8).init(allocator),
             .points = ArrayList(u16).init(allocator),
             .count = ArrayList(u16).init(allocator),
-            .occurrences = 0,
         };
     }
 
@@ -52,22 +51,29 @@ const Value = struct {
         try self.files.insert(idx, file);
         try self.points.insert(idx, points);
         try self.count.insert(idx, count);
-
-        self.occurrences += points;
     }
 
-    pub fn get(self: Self) ?[max_filename_length]u8 {
-        return self.files.items[0];
+    pub fn get(self: Self) ?Tuple(&.{ [max_filename_length]u8, f64, f64 }) {
+        if (self.files.items.len == 0) {
+            return null;
+        }
+        return .{
+            self.files.items[0],
+            @intToFloat(f64, self.points.items[0]) / @intToFloat(f64, self.count.items[0]),
+            @intToFloat(f64, self.files.items.len), // the amount of files this word can be found in
+        };
     }
 };
 
 pub const Search = struct {
     words: AutoHashMap([wz.max_word_length]u8, Value),
+    files: ArrayList([max_filename_length]u8),
     const Self = @This();
 
     pub fn init(allocator: Allocator) Self {
         return Self{
             .words = AutoHashMap([wz.max_word_length]u8, Value).init(allocator),
+            .files = ArrayList([max_filename_length]u8).init(allocator),
         };
     }
 
@@ -77,6 +83,11 @@ pub const Search = struct {
             word.deinit();
         }
         self.words.deinit();
+        self.files.deinit();
+    }
+
+    pub fn addFile(self: *Self, file_name: []const u8) !void {
+        try self.files.append(file_name);
     }
 
     pub fn put(self: *Self, allocator: *const Allocator, word: [wz.max_word_length]u8, file: [max_filename_length]u8, points: u16, count: u16) !void {
@@ -89,10 +100,27 @@ pub const Search = struct {
         try v.value_ptr.*.push(file, points, count);
     }
 
-    pub fn get(self: *Self, word: [wz.max_word_length]u8) ?[max_filename_length]u8 {
+    pub fn get(self: *Self, word: [wz.max_word_length]u8) ?Tuple(&.{ [max_filename_length]u8, f64 }) {
         if (self.words.get(word)) |value| {
-            return value.get();
+            if (value.get()) |found| {
+                const file_name = found[0];
+                const tf = found[1];
+                const idf = found[2] / (@intToFloat(f64, self.files.items.len) + 1.0);
+                return .{
+                    file_name,
+                    tf * idf,
+                };
+            }
         }
         return null;
+    }
+
+    pub fn search(self: *Self, query: []const u8) !void {
+        var tokens = std.mem.split(u8, query, " ");
+        while (tokens.next()) |token| {
+            if (self.get(h.literalToArr(token))) |found| {
+                std.debug.print("{s}: {s} ({any})\n", .{ token, found[0], found[1] });
+            }
+        }
     }
 };
