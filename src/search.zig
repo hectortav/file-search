@@ -8,13 +8,19 @@ const wz = @import("words.zig");
 pub const max_filename_length: u8 = 250;
 
 const Value = struct {
-    files: ArrayList([max_filename_length]u8),
-    points: ArrayList(u16),
-    count: ArrayList(u16),
+    files: ArrayList([max_filename_length]u8), // the file
+    points: ArrayList(u16), // the amount of times the word is in the file
+    count: ArrayList(u16), // the length of the file in words
+    occurrences: u16,
     const Self = @This();
 
     pub fn init(allocator: Allocator) Self {
-        return Self{ .files = ArrayList([max_filename_length]u8).init(allocator), .points = ArrayList(u16).init(allocator), .count = ArrayList(u16).init(allocator) };
+        return Self{
+            .files = ArrayList([max_filename_length]u8).init(allocator),
+            .points = ArrayList(u16).init(allocator),
+            .count = ArrayList(u16).init(allocator),
+            .occurrences = 0,
+        };
     }
 
     pub fn deinit(self: *Self) void {
@@ -36,9 +42,18 @@ const Value = struct {
             _ = self.points.orderedRemove(i);
             _ = self.count.orderedRemove(i);
         }
-        try self.files.append(file);
-        try self.points.append(points);
-        try self.count.append(count);
+
+        const our_tf = points / count;
+        const idx = for (self.points.items) |p, i| {
+            const their_tf = p / self.count.items[i];
+            if (our_tf >= their_tf) break i;
+        } else self.points.items.len;
+
+        try self.files.insert(idx, file);
+        try self.points.insert(idx, points);
+        try self.count.insert(idx, count);
+
+        self.occurrences += points;
     }
 
     pub fn get(self: Self) ?[max_filename_length]u8 {
@@ -51,7 +66,9 @@ pub const Search = struct {
     const Self = @This();
 
     pub fn init(allocator: Allocator) Self {
-        return Self{ .words = AutoHashMap([wz.max_word_length]u8, Value).init(allocator) };
+        return Self{
+            .words = AutoHashMap([wz.max_word_length]u8, Value).init(allocator),
+        };
     }
 
     pub fn deinit(self: *Self) void {
