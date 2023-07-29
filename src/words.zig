@@ -2,15 +2,18 @@ const std = @import("std");
 const io = std.io;
 const ArrayList = std.ArrayList;
 const Allocator = std.mem.Allocator;
+const Tuple = std.meta.Tuple;
+
+pub const max_word_length: u8 = 25;
 
 pub const Words = struct {
-    words: ArrayList([25]u8),
+    words: ArrayList([max_word_length]u8),
     points: ArrayList(u16),
     count: u16,
     const Self = @This();
 
     pub fn init(allocator: Allocator) Self {
-        return Self{ .words = ArrayList([25]u8).init(allocator), .points = ArrayList(u16).init(allocator), .count = 0 };
+        return Self{ .words = ArrayList([max_word_length]u8).init(allocator), .points = ArrayList(u16).init(allocator), .count = 0 };
     }
 
     pub fn deinit(self: *Self) void {
@@ -18,7 +21,7 @@ pub const Words = struct {
         self.points.deinit();
     }
 
-    pub fn push(self: *Self, val: [25]u8) !void {
+    pub fn push(self: *Self, val: [max_word_length]u8) !void {
         const index = for (self.words.items) |w, i| {
             if (std.mem.eql(u8, &w, &val)) break i;
         } else null;
@@ -32,11 +35,18 @@ pub const Words = struct {
         self.count += 1;
     }
 
-    pub fn count(self: *Self) u16 {
+    pub fn count(self: *Self) usize {
         return self.count;
     }
 
-    pub fn len(self: *Self) u16 {
+    pub fn len(self: *Self) usize {
         return self.words.items.len;
+    }
+
+    pub fn get(self: *Self, index: usize) ?Tuple(&.{ [max_word_length]u8, u16 }) {
+        if (index >= self.len()) {
+            return null;
+        }
+        return .{ self.words.items[index], self.points.items[index] };
     }
 };
