@@ -18,9 +18,9 @@ const Value = struct {
     }
 
     pub fn deinit(self: *Self) void {
-        for (self.files.items) |file, i| {
-            std.debug.print("{s} {d} {d}\n", .{ file, self.points.items[i], self.count.items[i] });
-        }
+        // for (self.files.items) |file, i| {
+        //     std.debug.print("{s} {d} {d}\n", .{ file, self.points.items[i], self.count.items[i] });
+        // }
         self.files.deinit();
         self.points.deinit();
         self.count.deinit();
@@ -55,10 +55,10 @@ pub const Search = struct {
     }
 
     pub fn deinit(self: *Self) void {
-        // var it = self.words.valueIterator();
-        // while (it.next()) |word| {
-        //     word.deinit();
-        // }
+        var it = self.words.valueIterator();
+        while (it.next()) |word| {
+            word.deinit();
+        }
         self.words.deinit();
     }
 

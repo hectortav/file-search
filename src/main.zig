@@ -8,41 +8,9 @@ const ArrayList = std.ArrayList;
 
 fn literalToArr(literal: []const u8) [wz.max_word_length]u8 {
     var arr: [wz.max_word_length]u8 = [_:0]u8{0} ** wz.max_word_length;
-    var i: usize = 0;
-    while (i < literal.len) {
-        arr[i] = literal[i];
-        i += 1;
-    }
+    std.mem.copy(u8, &arr, literal);
 
     return arr;
-}
-
-fn indexFile(words_list: *wz.Words, file: std.fs.File) !void {
-    var buf_reader = std.io.bufferedReader(file.reader());
-    var in_stream = buf_reader.reader();
-
-    var buf: [1024]u8 = undefined;
-    while (try in_stream.readUntilDelimiterOrEof(&buf, '\n')) |line| {
-        var words = std.mem.split(u8, line, " ");
-        while (words.next()) |word| {
-            var i: usize = 0;
-            var clean_word: [25]u8 = [_:0]u8{0} ** 25;
-            for (word) |char| {
-                if (std.ascii.isAlphabetic(char) or std.ascii.isDigit(char)) {
-                    clean_word[i] = char;
-                    i += 1;
-                } else {
-                    if (i > 0) {
-                        try words_list.*.push(clean_word);
-                        i = 0;
-                    }
-                }
-            }
-            if (i > 0) {
-                try words_list.*.push(clean_word);
-            }
-        }
-    }
 }
 
 fn getFiles(allocator: *const std.mem.Allocator, file_list: *ArrayList([s.max_filename_length]u8), dir: []const u8) !void {
@@ -88,13 +56,13 @@ fn getFiles(allocator: *const std.mem.Allocator, file_list: *ArrayList([s.max_fi
 }
 
 pub fn main() !void {
-    // var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    // defer std.debug.assert(!gpa.deinit());
-    // var allocator = gpa.allocator();
-    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-    defer arena.deinit();
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer std.debug.assert(!gpa.deinit());
+    const allocator = gpa.allocator();
+    // var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    // defer arena.deinit();
 
-    const allocator = arena.allocator();
+    // const allocator = arena.allocator();
 
     var search = s.Search.init(allocator);
     defer search.deinit();
@@ -116,7 +84,7 @@ pub fn main() !void {
         var words_list = wz.Words.init(allocator);
         defer words_list.deinit();
 
-        try indexFile(&words_list, file);
+        try words_list.indexFile(file);
         var word_count = words_list.count;
         // std.debug.print("word count: {d}\n", .{word_count});
 
