@@ -53,13 +53,13 @@ const Value = struct {
         try self.count.insert(idx, count);
     }
 
-    pub fn get(self: Self) ?Tuple(&.{ [max_filename_length]u8, f64, f64 }) {
-        if (self.files.items.len == 0) {
+    pub fn get(self: Self, index: usize) ?Tuple(&.{ [max_filename_length]u8, f64, f64 }) {
+        if (self.files.items.len <= index) {
             return null;
         }
         return .{
-            self.files.items[0],
-            @intToFloat(f64, self.points.items[0]) / @intToFloat(f64, self.count.items[0]),
+            self.files.items[index],
+            @intToFloat(f64, self.points.items[index]) / @intToFloat(f64, self.count.items[index]),
             @intToFloat(f64, self.files.items.len), // the amount of files this word can be found in
         };
     }
@@ -68,12 +68,14 @@ const Value = struct {
 pub const Search = struct {
     words: AutoHashMap([wz.max_word_length]u8, Value),
     files: ArrayList([max_filename_length]u8),
+    results: AutoHashMap([max_filename_length]u8, f64),
     const Self = @This();
 
     pub fn init(allocator: Allocator) Self {
         return Self{
             .words = AutoHashMap([wz.max_word_length]u8, Value).init(allocator),
             .files = ArrayList([max_filename_length]u8).init(allocator),
+            .results = undefined, // AutoHashMap([max_filename_length]u8, f64).init(allocator),
         };
     }
 
@@ -100,27 +102,45 @@ pub const Search = struct {
         try v.value_ptr.*.push(file, points, count);
     }
 
-    pub fn get(self: *Self, word: [wz.max_word_length]u8) ?Tuple(&.{ [max_filename_length]u8, f64 }) {
+    pub fn get(self: *Self, word: [wz.max_word_length]u8) !void {
         if (self.words.get(word)) |value| {
-            if (value.get()) |found| {
+            var i: usize = 0;
+            while (value.get(i)) |found| {
                 const file_name = found[0];
                 const tf = found[1];
                 const idf = found[2] / (@intToFloat(f64, self.files.items.len) + 1.0);
-                return .{
-                    file_name,
-                    tf * idf,
-                };
+                var v = try self.results.getOrPut(file_name);
+                if (!v.found_existing) {
+                    v.value_ptr.* = 0;
+                }
+                v.value_ptr.* += tf * idf;
+                i += 1;
             }
         }
-        return null;
     }
 
-    pub fn search(self: *Self, query: []const u8) !void {
+    pub fn search(self: *Self, allocator: *const Allocator, list: *ArrayList(Tuple(&.{ [max_filename_length]u8, f64 })), query: []const u8) !void {
         var tokens = std.mem.split(u8, query, " ");
+        self.results = AutoHashMap([max_filename_length]u8, f64).init(allocator.*);
+        defer self.results.deinit();
+
         while (tokens.next()) |token| {
-            if (self.get(h.literalToArr(token))) |found| {
-                std.debug.print("{s}: {s} ({any})\n", .{ token, found[0], found[1] });
+            if (token.len > 0) {
+                try self.get(h.literalToArr(token));
             }
+        }
+
+        var it = self.results.iterator();
+        while (it.next()) |res| {
+            const idx = for (list.*.items) |l, i| {
+                if (res.value_ptr.* >= l[1]) break i;
+            } else list.*.items.len;
+            // std.debug.print("{s} ({d}) {d}\n", .{
+            //     res.key_ptr.*,
+            //     res.value_ptr.*,
+            // });
+
+            try list.*.insert(idx, .{ res.key_ptr.*, res.value_ptr.* });
         }
     }
 };

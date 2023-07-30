@@ -4,6 +4,7 @@ const s = @import("search.zig");
 const h = @import("helpers.zig");
 const io = std.io;
 const os = std.os;
+const Tuple = std.meta.Tuple;
 
 const ArrayList = std.ArrayList;
 
@@ -18,6 +19,7 @@ fn getFiles(allocator: *const std.mem.Allocator, file_list: *ArrayList([s.max_fi
 
         const dir_path = std.fs.realpathAlloc(allocator.*, path) catch null;
         if (dir_path) |p| {
+            // std.debug.print("{s}\n", .{p});
             var cur_dir = try std.fs.cwd().openIterableDir(p, .{});
             defer cur_dir.close();
             defer (allocator.*).free(p);
@@ -91,5 +93,18 @@ pub fn main() !void {
             i += 1;
         }
     }
-    try search.search("tests ArrayList");
+    var results = ArrayList(Tuple(&.{ [s.max_filename_length]u8, f64 })).init(allocator);
+    defer results.deinit();
+    try search.search(&allocator, &results,
+        \\ if div Switch
+    );
+
+    for (results.items) |res| {
+        const file = res[0];
+        const rank = res[1];
+        std.debug.print("{s} ({d})\n", .{
+            file,
+            rank,
+        });
+    }
 }
