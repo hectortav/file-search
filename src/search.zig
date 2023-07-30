@@ -10,15 +10,15 @@ pub const max_filename_length: u8 = 250;
 
 const Value = struct {
     files: ArrayList([max_filename_length]u8), // the file
-    points: ArrayList(u16), // the amount of times the word is in the file
-    count: ArrayList(u16), // the length of the file in words
+    points: ArrayList(u32), // the amount of times the word is in the file
+    count: ArrayList(u32), // the length of the file in words
     const Self = @This();
 
     pub fn init(allocator: Allocator) Self {
         return Self{
             .files = ArrayList([max_filename_length]u8).init(allocator),
-            .points = ArrayList(u16).init(allocator),
-            .count = ArrayList(u16).init(allocator),
+            .points = ArrayList(u32).init(allocator),
+            .count = ArrayList(u32).init(allocator),
         };
     }
 
@@ -31,7 +31,7 @@ const Value = struct {
         self.count.deinit();
     }
 
-    pub fn push(self: *Self, file: [max_filename_length]u8, points: u16, count: u16) !void {
+    pub fn push(self: *Self, file: [max_filename_length]u8, points: u32, count: u32) !void {
         const index = for (self.files.items) |f, i| {
             if (std.mem.eql(u8, &f, &file)) break i;
         } else null;
@@ -88,11 +88,11 @@ pub const Search = struct {
         self.files.deinit();
     }
 
-    pub fn addFile(self: *Self, file_name: []const u8) !void {
+    pub fn addFile(self: *Self, file_name: [max_filename_length]u8) !void {
         try self.files.append(file_name);
     }
 
-    pub fn put(self: *Self, allocator: *const Allocator, word: [wz.max_word_length]u8, file: [max_filename_length]u8, points: u16, count: u16) !void {
+    pub fn put(self: *Self, allocator: *const Allocator, word: [wz.max_word_length]u8, file: [max_filename_length]u8, points: u32, count: u32) !void {
         var v = try self.words.getOrPut(word);
 
         if (!v.found_existing) {
@@ -142,5 +142,10 @@ pub const Search = struct {
 
             try list.*.insert(idx, .{ res.key_ptr.*, res.value_ptr.* });
         }
+    }
+
+    pub fn stats(self: *Self) void {
+        std.debug.print("Indexed {d} files\n", .{self.files.items.len});
+        std.debug.print("Found {d} words\n", .{self.words.count()});
     }
 };

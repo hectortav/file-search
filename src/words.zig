@@ -13,14 +13,14 @@ pub const max_word_length: u8 = 25;
 
 pub const Words = struct {
     words: ArrayList([max_word_length]u8),
-    points: ArrayList(u16),
-    count: u16,
+    points: ArrayList(u32),
+    count: u32,
     const Self = @This();
 
     pub fn init(allocator: Allocator) Self {
         return Self{
             .words = ArrayList([max_word_length]u8).init(allocator),
-            .points = ArrayList(u16).init(allocator),
+            .points = ArrayList(u32).init(allocator),
             .count = 0,
         };
     }
@@ -52,7 +52,7 @@ pub const Words = struct {
         return self.words.items.len;
     }
 
-    pub fn get(self: *Self, index: usize) ?Tuple(&.{ [max_word_length]u8, u16 }) {
+    pub fn get(self: *Self, index: usize) ?Tuple(&.{ [max_word_length]u8, u32 }) {
         if (index >= self.len()) {
             return null;
         }

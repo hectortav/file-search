@@ -8,27 +8,124 @@ const Tuple = std.meta.Tuple;
 
 const ArrayList = std.ArrayList;
 
-fn getFiles(allocator: *const std.mem.Allocator, file_list: *ArrayList([s.max_filename_length]u8), dir: []const u8) !void {
+const stdout = std.io.getStdOut().writer();
+const stdin = std.io.getStdIn().reader();
+
+pub fn concatPaths(str1: []const u8, str2: []const u8) [s.max_filename_length]u8 {
+    var str: [s.max_filename_length]u8 = [_:0]u8{0} ** s.max_filename_length;
+    var i: usize = 0;
+    while (i < str1.len) {
+        str[i] = str1[i];
+        i += 1;
+    }
+    var offset: usize = 0;
+    if (str1[str1.len - 1] != '/') {
+        str[i] = '/';
+        i += 1;
+        offset = 1;
+    }
+    while (i - str1.len - offset < str2.len) {
+        str[i] = str2[i - str1.len - offset];
+        i += 1;
+    }
+    return str;
+}
+
+pub fn getExtension(str: []const u8) ?[5]u8 {
+    var i: usize = str.len - 1;
+    var ext: [5]u8 = [_:0]u8{0} ** 5;
+    // std.debug.print("{s}\n", .{str});
+    while (i + 1 + 5 > str.len and i > 0) : (i -= 1) {
+        if (str[i] == '.') {
+            var j: usize = 0;
+            i += 1;
+            while (i < str.len) : (i += 1) {
+                ext[j] = str[i];
+                j += 1;
+            }
+            return ext;
+        }
+    }
+    return null;
+}
+
+fn eql(comptime T: type, a: []const T, b: []const T) bool {
+    var ai: usize = a.len - 1;
+    var bi: usize = b.len - 1;
+    while (a[ai] == 0) : (ai -= 1) {}
+    while (b[bi] == 0) : (bi -= 1) {}
+    if (ai != bi) return false;
+    var i = ai;
+    while (true) : (i -= 1) {
+        if (a[i] != b[i]) return false;
+        if (i == 0) break;
+    }
+    return true;
+}
+
+fn getFiles(
+    allocator: *const std.mem.Allocator,
+    file_list: *ArrayList([s.max_filename_length]u8),
+    dir: []const u8,
+    to_include: ArrayList([]const u8),
+) !void {
     var cur_dir = try std.fs.cwd().openIterableDir(dir, .{});
     defer cur_dir.close();
 
     var walker = try cur_dir.walk(allocator.*);
     defer walker.deinit();
 
-    while (try walker.next()) |file| {
-        // std.debug.print("{}: basename: '{s}' path: '{s}'\n", .{ file.kind, file.basename, file.path });
-        if (file.basename[0] != '.') {
-            if (file.kind == .File) {
-                try file_list.append(h.literalToArrF(file.path));
+    while (true) {
+        if (walker.next()) |next_file| {
+            if (next_file) |file| {
+                // std.debug.print("{}: basename: '{s}' path: '{s}'\n", .{ file.kind, file.basename, file.path });
+                if (file.basename[0] != '.') {
+                    if (file.kind == .File) {
+                        var extension = getExtension(file.basename);
+                        if (extension) |ext| {
+                            for (to_include.items) |e| {
+                                // std.debug.print("{s} {s}\n", .{ e, ext });
+                                if (eql(u8, e, &ext)) {
+                                    try file_list.append(concatPaths(dir, file.path));
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+                continue;
+            }
+            break;
+        } else |err| {
+            if (err != std.fs.Dir.OpenError.AccessDenied) {
+                return err;
             }
         }
     }
+}
+
+fn getUserInput() !?[]u8 {
+    var buf: [250]u8 = undefined;
+
+    if (try stdin.readUntilDelimiterOrEof(buf[0..], '\n')) |user_input| {
+        return user_input;
+    }
+    return null;
 }
 
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer std.debug.assert(!gpa.deinit());
     const allocator = gpa.allocator();
+
+    const args = try std.process.argsAlloc(allocator);
+    defer allocator.free(args);
+
+    if (args.len < 2) {
+        try stdout.print("usage: {s} <directory_to_index>", .{args[0]});
+        return;
+    }
+
     // var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     // defer arena.deinit();
 
@@ -40,7 +137,18 @@ pub fn main() !void {
     var file_list = ArrayList([s.max_filename_length]u8).init(allocator);
     defer file_list.deinit();
 
-    try getFiles(&allocator, &file_list, ".");
+    var to_include = ArrayList([]const u8).init(allocator);
+    defer to_include.deinit();
+
+    try to_include.append("md");
+    try to_include.append("txt");
+
+    try getFiles(
+        &allocator,
+        &file_list,
+        args[1],
+        to_include,
+    );
 
     for (file_list.items) |file_name| {
         // std.debug.print("{s}\n", .{file_name});
@@ -67,20 +175,33 @@ pub fn main() !void {
                 try search.put(&allocator, word, file_name, points, word_count);
                 i += 1;
             }
+            try search.addFile(file_name);
         }
     }
-    var results = ArrayList(Tuple(&.{ [s.max_filename_length]u8, f64 })).init(allocator);
-    defer results.deinit();
-    try search.search(&allocator, &results,
-        \\ GeneralPurposeAllocator ArenaAllocator const
-    );
 
-    for (results.items) |res| {
-        const file = res[0];
-        const rank = res[1];
-        std.debug.print("{s} ({d})\n", .{
-            file,
-            rank,
-        });
+    search.stats();
+    try stdout.print("\n~ Type a query or :q to quit ~\n", .{});
+    while (true) {
+        try stdout.print("\nSearch: ", .{});
+        if (try getUserInput()) |query| {
+            if (eql(u8, query, ":q")) break;
+
+            var results = ArrayList(Tuple(&.{ [s.max_filename_length]u8, f64 })).init(allocator);
+            defer results.deinit();
+            try search.search(&allocator, &results, query);
+
+            var i: usize = 0;
+            for (results.items) |res| {
+                const file = res[0];
+                const rank = res[1];
+                try stdout.print("{s} ({d})\n", .{
+                    file,
+                    rank,
+                });
+                if (i > 10) break;
+                i += 1;
+            }
+            std.debug.print("\n", .{});
+        }
     }
 }
