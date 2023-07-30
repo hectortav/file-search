@@ -126,7 +126,7 @@ pub const Search = struct {
 
         while (tokens.next()) |token| {
             if (token.len > 0) {
-                try self.get(h.literalToArr(token));
+                try self.get(h.literalToArrW(token));
             }
         }
 

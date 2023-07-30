@@ -4,6 +4,11 @@ const ArrayList = std.ArrayList;
 const Allocator = std.mem.Allocator;
 const Tuple = std.meta.Tuple;
 
+fn is_binary(data: []const u8, len: usize) bool {
+    var s = [_]u8{0};
+    return std.mem.indexOf(u8, data[0..len], &s) != null;
+}
+
 pub const max_word_length: u8 = 25;
 
 pub const Words = struct {
@@ -54,31 +59,41 @@ pub const Words = struct {
         return .{ self.words.items[index], self.points.items[index] };
     }
 
-    pub fn indexFile(self: *Self, file: std.fs.File) !void {
-        var buf_reader = std.io.bufferedReader(file.reader());
-        var in_stream = buf_reader.reader();
+    pub fn indexFile(self: *Self, allocator: *const Allocator, file: std.fs.File) !bool {
+        const file_size = try file.getEndPos();
+        // const max_bytes = @intCast(usize, file_size);
+        const contents = try allocator.alloc(u8, file_size);
+        _ = try file.read(contents);
+        defer allocator.free(contents);
 
-        var buf: [1024]u8 = undefined;
-        while (try in_stream.readUntilDelimiterOrEof(&buf, '\n')) |line| {
-            var words = std.mem.split(u8, line, " ");
-            while (words.next()) |word| {
-                var i: usize = 0;
-                var clean_word: [25]u8 = [_:0]u8{0} ** 25;
-                for (word) |char| {
-                    if (std.ascii.isAlphabetic(char) or std.ascii.isDigit(char)) {
-                        clean_word[i] = char;
-                        i += 1;
-                    } else {
-                        if (i > 0) {
-                            try self.*.push(clean_word);
-                            i = 0;
-                        }
+        if (is_binary(contents, std.math.min(250, file_size))) {
+            return false;
+        }
+
+        var words = std.mem.split(u8, contents, " ");
+        while (words.next()) |word| {
+            if (word.len >= max_word_length) {
+                // std.debug.print("[WARN]: skipping word with length {d}\nMax length is set to {d}\n", .{ word.len, max_word_length });
+                continue;
+            }
+            var i: usize = 0;
+            var clean_word: [max_word_length]u8 = [_:0]u8{0} ** max_word_length;
+            for (word) |char| {
+                if (std.ascii.isAlphabetic(char) or std.ascii.isDigit(char)) {
+                    clean_word[i] = char;
+                    i += 1;
+                } else {
+                    if (i > 0) {
+                        try self.*.push(clean_word);
+                        i = 0;
                     }
                 }
-                if (i > 0) {
-                    try self.*.push(clean_word);
-                }
+            }
+            if (i > 0) {
+                try self.*.push(clean_word);
             }
         }
+
+        return true;
     }
 };
