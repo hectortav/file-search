@@ -119,13 +119,19 @@ pub const Search = struct {
         }
     }
 
-    pub fn search(self: *Self, allocator: *const Allocator, list: *ArrayList(Tuple(&.{ [max_filename_length]u8, f64 })), query: []const u8) !void {
+    pub fn search(
+        self: *Self,
+        allocator: *const Allocator,
+        list: *ArrayList(Tuple(&.{ [max_filename_length]u8, f64 })),
+        query: []const u8,
+    ) !void {
         var tokens = std.mem.split(u8, query, " ");
         self.results = AutoHashMap([max_filename_length]u8, f64).init(allocator.*);
         defer self.results.deinit();
 
         while (tokens.next()) |token| {
             if (token.len > 0) {
+                // std.debug.print("{s} {d}\n", .{ token, token.len });
                 try self.get(h.literalToArrW(token));
             }
         }
@@ -135,17 +141,12 @@ pub const Search = struct {
             const idx = for (list.*.items) |l, i| {
                 if (res.value_ptr.* >= l[1]) break i;
             } else list.*.items.len;
-            // std.debug.print("{s} ({d}) {d}\n", .{
-            //     res.key_ptr.*,
-            //     res.value_ptr.*,
-            // });
 
             try list.*.insert(idx, .{ res.key_ptr.*, res.value_ptr.* });
         }
     }
 
-    pub fn stats(self: *Self) void {
-        std.debug.print("Indexed {d} files\n", .{self.files.items.len});
-        std.debug.print("Found {d} words\n", .{self.words.count()});
+    pub fn stats(self: *Self) struct { files_len: usize, words_len: usize } {
+        return .{ .files_len = self.files.items.len, .words_len = self.words.count() };
     }
 };

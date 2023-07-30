@@ -5,7 +5,7 @@ const h = @import("helpers.zig");
 const io = std.io;
 const os = std.os;
 const Tuple = std.meta.Tuple;
-
+const Allocator = std.mem.Allocator;
 const ArrayList = std.ArrayList;
 
 const stdout = std.io.getStdOut().writer();
@@ -64,11 +64,12 @@ fn eql(comptime T: type, a: []const T, b: []const T) bool {
 }
 
 fn getFiles(
-    allocator: *const std.mem.Allocator,
+    allocator: *const Allocator,
     file_list: *ArrayList([s.max_filename_length]u8),
     dir: []const u8,
     to_include: ArrayList([]const u8),
-) !void {
+) !u64 {
+    var count: u64 = 0;
     var cur_dir = try std.fs.cwd().openIterableDir(dir, .{});
     defer cur_dir.close();
 
@@ -81,6 +82,7 @@ fn getFiles(
                 // std.debug.print("{}: basename: '{s}' path: '{s}'\n", .{ file.kind, file.basename, file.path });
                 if (file.basename[0] != '.') {
                     if (file.kind == .File) {
+                        count += 1;
                         var extension = getExtension(file.basename);
                         if (extension) |ext| {
                             for (to_include.items) |e| {
@@ -102,15 +104,16 @@ fn getFiles(
             }
         }
     }
+    return count;
 }
 
-fn getUserInput() !?[]u8 {
+fn getUserInput(allocator: *const Allocator, input: *[]u8) !void {
     var buf: [250]u8 = undefined;
 
     if (try stdin.readUntilDelimiterOrEof(buf[0..], '\n')) |user_input| {
-        return user_input;
+        input.* = try allocator.alloc(u8, user_input.len);
+        std.mem.copy(u8, input.*, user_input);
     }
-    return null;
 }
 
 pub fn main() !void {
@@ -143,7 +146,8 @@ pub fn main() !void {
     try to_include.append("md");
     try to_include.append("txt");
 
-    try getFiles(
+    var index_timer = try std.time.Timer.start();
+    const files_count = try getFiles(
         &allocator,
         &file_list,
         args[1],
@@ -179,17 +183,28 @@ pub fn main() !void {
         }
     }
 
-    search.stats();
+    const stats = search.stats();
+    try stdout.print("Searched {d} files\n", .{files_count});
+    try stdout.print("Indexed {d} files\n", .{stats.files_len});
+    try stdout.print("Found {d} words\n", .{stats.words_len});
+    try stdout.print("In {}\n", .{std.fmt.fmtDuration(index_timer.read())});
+
     try stdout.print("\n~ Type a query or :q to quit ~\n", .{});
     while (true) {
         try stdout.print("\nSearch: ", .{});
-        if (try getUserInput()) |query| {
+        var query: []u8 = undefined;
+        defer allocator.free(query);
+        try getUserInput(&allocator, &query);
+        if (query[0] != 0) {
             if (eql(u8, query, ":q")) break;
 
+            var search_timer = try std.time.Timer.start();
             var results = ArrayList(Tuple(&.{ [s.max_filename_length]u8, f64 })).init(allocator);
             defer results.deinit();
+
             try search.search(&allocator, &results, query);
 
+            try stdout.print("{d} results in {}\n", .{ results.items.len, std.fmt.fmtDuration(search_timer.read()) });
             var i: usize = 0;
             for (results.items) |res| {
                 const file = res[0];
