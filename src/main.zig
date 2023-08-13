@@ -81,7 +81,7 @@ fn getFiles(
             if (next_file) |file| {
                 // std.debug.print("{}: basename: '{s}' path: '{s}'\n", .{ file.kind, file.basename, file.path });
                 if (file.basename[0] != '.') {
-                    if (file.kind == .File) {
+                    if (file.kind == .file) {
                         count += 1;
                         var extension = getExtension(file.basename);
                         if (extension) |ext| {
@@ -118,7 +118,7 @@ fn getUserInput(allocator: *const Allocator, input: *[]u8) !void {
 
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer std.debug.assert(!gpa.deinit());
+    defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
     const args = try std.process.argsAlloc(allocator);
@@ -143,8 +143,8 @@ pub fn main() !void {
     var to_include = ArrayList([]const u8).init(allocator);
     defer to_include.deinit();
 
-    try to_include.append("md");
-    try to_include.append("txt");
+    try to_include.append("tsx");
+    try to_include.append("ts");
 
     var index_timer = try std.time.Timer.start();
     const files_count = try getFiles(
@@ -156,7 +156,7 @@ pub fn main() !void {
 
     for (file_list.items) |file_name| {
         // std.debug.print("{s}\n", .{file_name});
-        const index = for (file_name) |char, i| {
+        const index = for (file_name, 0..) |char, i| {
             if (char == 0) break i;
         } else file_name.len;
 

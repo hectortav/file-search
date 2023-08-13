@@ -32,7 +32,7 @@ const Value = struct {
     }
 
     pub fn push(self: *Self, file: [max_filename_length]u8, points: u32, count: u32) !void {
-        const index = for (self.files.items) |f, i| {
+        const index = for (self.files.items, 0..) |f, i| {
             if (std.mem.eql(u8, &f, &file)) break i;
         } else null;
 
@@ -43,7 +43,7 @@ const Value = struct {
         }
 
         const our_tf = points / count;
-        const idx = for (self.points.items) |p, i| {
+        const idx = for (self.points.items, 0..) |p, i| {
             const their_tf = p / self.count.items[i];
             if (our_tf >= their_tf) break i;
         } else self.points.items.len;
@@ -59,8 +59,8 @@ const Value = struct {
         }
         return .{
             self.files.items[index],
-            @intToFloat(f64, self.points.items[index]) / @intToFloat(f64, self.count.items[index]),
-            @intToFloat(f64, self.files.items.len), // the amount of files this word can be found in
+            @as(f64, @floatFromInt(self.points.items[index])) / @as(f64, @floatFromInt(self.count.items[index])),
+            @as(f64, @floatFromInt(self.files.items.len)), // the amount of files this word can be found in
         };
     }
 };
@@ -108,7 +108,7 @@ pub const Search = struct {
             while (value.get(i)) |found| {
                 const file_name = found[0];
                 const tf = found[1];
-                const idf = found[2] / (@intToFloat(f64, self.files.items.len) + 1.0);
+                const idf = found[2] / (@as(f64, @floatFromInt(self.files.items.len)) + 1.0);
                 var v = try self.results.getOrPut(file_name);
                 if (!v.found_existing) {
                     v.value_ptr.* = 0;
@@ -138,7 +138,7 @@ pub const Search = struct {
 
         var it = self.results.iterator();
         while (it.next()) |res| {
-            const idx = for (list.*.items) |l, i| {
+            const idx = for (list.*.items, 0..) |l, i| {
                 if (res.value_ptr.* >= l[1]) break i;
             } else list.*.items.len;
 

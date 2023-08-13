@@ -31,7 +31,7 @@ pub const Words = struct {
     }
 
     pub fn push(self: *Self, val: [max_word_length]u8) !void {
-        const index = for (self.words.items) |w, i| {
+        const index = for (self.words.items, 0..) |w, i| {
             if (std.mem.eql(u8, &w, &val)) break i;
         } else null;
 
@@ -66,7 +66,7 @@ pub const Words = struct {
         _ = try file.read(contents);
         defer allocator.free(contents);
 
-        if (is_binary(contents, std.math.min(250, file_size))) {
+        if (is_binary(contents, @min(250, file_size))) {
             return false;
         }
 
